@@ -18,7 +18,7 @@ contract Symeta is Ownable{
     //
     mapping(address=>bool) public workers;
     mapping(address=>bool) public currencies;
-    mapping(address=>bool) public merchants;
+    EnumerableSet.AddressSet private merchants;
     mapping(address=>mapping(address=>Subscription)) public subscription;//user=>merchant=>struct
     mapping(address=>EnumerableSet.AddressSet) private userActive; //users=>active merchant address
     mapping(address=>EnumerableSet.AddressSet) private merchantActive; //merchant=>active users address
@@ -41,8 +41,14 @@ contract Symeta is Ownable{
         _;
     }
     function setMerchant(address _merchant,bool _active) public onlyOwner {
-        require(merchants[_merchant]!=_active,"merchant is already set as you want");
-        merchants[_merchant] = _active;
+        if(_active){
+            require(!merchants.contains(_merchant),"merchant has already been activated");
+            merchants.add(_merchant);
+        } else {
+            require(merchants.contains(_merchant),"merchant has been deleted");
+            merchants.remove(_merchant);
+        }
+        
         emit SetMerchant(_merchant,_active);
     }
     function setCurrency(address _currency,bool _active) public onlyOwner {
@@ -99,8 +105,20 @@ contract Symeta is Ownable{
 
     function pay(address _merchant,address _currency, uint256 _amount,string calldata _sku) public {
         require(currencies[_currency],"currency is not allowed");
-        require(merchants[_merchant],"merchant is not registered");
+        require(merchants.contains(_merchant),"merchant is not registered");
         IERC20(_currency).transferFrom(_msgSender(),_merchant,_amount);
         emit Pay(_msgSender(), _merchant,_currency, _amount,  _sku);
+    }
+    function merchantLength() public view returns(uint256){
+        return merchants.length();
+    }
+    function checkMerchantIsActive(address _merchant) public view returns(bool){
+        return merchants.contains(_merchant);
+    }
+    function getMerchantByIndex(uint256 _index) public view returns(address){
+        return merchants.at(_index);
+    }
+    function getSubscriptionByUserAndMerchant(address _user,address _merchant) public view returns(Subscription memory){
+        return subscription[_user][_merchant];
     }
 }
